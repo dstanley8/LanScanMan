@@ -62,7 +62,7 @@ sudo apt install nmap rsync openssh-client && pip install PyQt6 paramiko python-
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/LanScanMan.git
+git clone https://github.com/dstanley8/LanScanMan.git
 cd LanScanMan
 pip install -r requirements.txt
 python main.py
