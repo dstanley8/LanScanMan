@@ -65,12 +65,14 @@ sudo apt install nmap rsync openssh-client && pip install PyQt6 paramiko python-
 git clone https://github.com/dstanley8/LanScanMan.git
 cd LanScanMan
 pip install -r requirements.txt
-python main.py
+python3 main.py
 ```
 
 A virtual environment is recommended:
 ```bash
-python -m venv .venv
+git clone https://github.com/dstanley8/LanScanMan.git
+cd LanScanMan
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python main.py
