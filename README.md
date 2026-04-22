@@ -102,7 +102,10 @@ By default, disk health uses `udisksctl` (no root needed), which provides basic 
 
 For full metrics (TBW, wear percentage, bad sector breakdown), grant passwordless sudo for `smartctl` on each remote host:
 
+verify with which smartctl first — the path must be exact or the sudoers rule won't match. 
+
 ```bash
+which smartctl
 echo 'yourusername ALL=(root) NOPASSWD: /usr/sbin/smartctl' | sudo tee /etc/sudoers.d/smartctl
 sudo chown root:root /etc/sudoers.d/smartctl
 sudo chmod 0440 /etc/sudoers.d/smartctl
@@ -149,7 +152,7 @@ All data is stored under `~/.config/LanScanMan/`:
 
 | File | Contents |
 |---|---|
-| `profiles.json` | Host aliases, usernames, MAC→IP mappings |
+| `hosts.json` | Host aliases, usernames, MAC→IP mappings |
 | `transfer_history.json` | Completed transfer records |
 | `schedules.json` | Scheduled rsync lists |
 | `schedules.hmac` | HMAC integrity signature for schedules.json |
