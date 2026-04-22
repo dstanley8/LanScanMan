@@ -185,7 +185,7 @@ LanScanMan/
 
 ## Tested On
 
-- Ubuntu 22.04 / 24.04
+- Ubuntu 24.04
 - Python 3.10+
 - PyQt6 6.4+
 
