@@ -104,8 +104,11 @@ For full metrics (TBW, wear percentage, bad sector breakdown), grant passwordles
 
 ```bash
 echo 'yourusername ALL=(root) NOPASSWD: /usr/sbin/smartctl' | sudo tee /etc/sudoers.d/smartctl
+sudo chown root:root /etc/sudoers.d/smartctl
+sudo chmod 0440 /etc/sudoers.d/smartctl
+sudo visudo -c   # validate — should print "parsed OK"
 ```
-
+If visudo -c reports an error, fix the file before logging out — a broken sudoers file can prevent all future sudo access.
 ---
 
 ## Keyboard Shortcuts
