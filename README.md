@@ -166,6 +166,7 @@ LanScanMan/
 ├── log.py                     # Centralised logger (console + rotating file)
 ├── schedule_manager.py        # Schedule data model, HMAC integrity, path validation
 ├── requirements.txt
+├── logo.png
 └── tabs/
     ├── dialogs.py             # Shared dialogs: CustomPortConnectDialog
     ├── scanner_tab.py         # Network Scanner tab
@@ -182,7 +183,7 @@ LanScanMan/
 
 ## Tested On
 
-- Ubuntu 24.04
+- Ubuntu 22.04 / 24.04
 - Python 3.10+
 - PyQt6 6.4+
 
