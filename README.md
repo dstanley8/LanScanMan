@@ -75,7 +75,7 @@ cd LanScanMan
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python main.py
+python3 main.py
 ```
 
 ---
@@ -168,7 +168,6 @@ LanScanMan/
 ├── log.py                     # Centralised logger (console + rotating file)
 ├── schedule_manager.py        # Schedule data model, HMAC integrity, path validation
 ├── requirements.txt
-├── logo.png
 └── tabs/
     ├── dialogs.py             # Shared dialogs: CustomPortConnectDialog
     ├── scanner_tab.py         # Network Scanner tab
