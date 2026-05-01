@@ -24,11 +24,6 @@ Built with Python and PyQt6. No server component, no browser, no subscription, n
 
 ---
 
-## Screenshots
-
-> Add screenshots here before publishing.
-
----
 
 ## Requirements
 
