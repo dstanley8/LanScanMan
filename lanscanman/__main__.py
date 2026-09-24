@@ -1,4 +1,4 @@
-"""Entry point: python3 main.py"""
+"""python -m lanscanman"""
 
 import sys
 

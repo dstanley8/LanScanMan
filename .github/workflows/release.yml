@@ -1,0 +1,55 @@
+name: Release AppImage
+
+# Push a tag like v0.3.0 to build the AppImage and attach it to a GitHub
+# release (created with auto-generated notes).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    runs-on: ubuntu-24.04
+    env:
+      QT_QPA_PLATFORM: offscreen
+      # AppImage tools run without FUSE on the runner
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0
+
+      - name: Test first
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest -q
+
+      - name: Build AppImage
+        run: |
+          pip install build python-appimage
+          PY=python ./packaging/build-appimage.sh
+          (cd dist && sha256sum LanScanMan-x86_64.AppImage > LanScanMan-x86_64.AppImage.sha256)
+
+      - name: Smoke test (starts, runs 10 s, no traceback)
+        run: |
+          export LANSCANMAN_CONFIG_DIR="$RUNNER_TEMP/cfg"
+          timeout 10 ./dist/LanScanMan-x86_64.AppImage > smoke.log 2>&1 || [ $? -eq 124 ]
+          ! grep -i traceback smoke.log
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/LanScanMan-x86_64.AppImage dist/LanScanMan-x86_64.AppImage.sha256 \
+            --title "LanScanMan $GITHUB_REF_NAME" --generate-notes

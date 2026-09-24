@@ -1,0 +1,27 @@
+[project]
+name = "lanscanman"
+version = "0.2.0"
+description = "Local-network administration desktop app for Linux (PyQt6)"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = ["PyQt6>=6.4.0", "paramiko>=3.0.0", "python-nmap>=0.7.1", "keyring>=24", "cryptography>=41"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pyflakes", "isort"]
+
+[project.scripts]
+lanscanman = "lanscanman.app:main"
+
+[tool.setuptools.packages.find]
+include = ["lanscanman*"]
+
+[tool.setuptools.package-data]
+"lanscanman.ui" = ["resources/*.html"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = ["lanscanman"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

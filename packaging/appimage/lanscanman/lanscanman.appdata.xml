@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>lanscanman</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>LanScanMan</name>
+  <summary>Local network administration desktop app</summary>
+  <description>
+    <p>Scan your subnet, monitor host health, manage file transfers, inspect open
+    ports, check disk SMART status, and find local AI servers.</p>
+  </description>
+  <launchable type="desktop-id">lanscanman.desktop</launchable>
+  <url type="homepage">https://github.com/dstanley8/lanscanman</url>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -1,3 +1,5 @@
 PyQt6>=6.4.0
 paramiko>=3.0.0
 python-nmap>=0.7.1
+keyring>=24
+cryptography>=41

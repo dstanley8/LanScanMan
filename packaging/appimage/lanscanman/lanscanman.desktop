@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=LanScanMan
+Comment=Local network scanner, host monitor, file transfers and AI launcher
+Exec=lanscanman
+Icon=lanscanman
+Terminal=false
+Categories=Network;System;Utility;

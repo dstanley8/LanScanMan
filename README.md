@@ -1,5 +1,7 @@
 # LanScanMan
 
+[![Tests](https://github.com/dstanley8/lanscanman/actions/workflows/tests.yml/badge.svg)](https://github.com/dstanley8/lanscanman/actions/workflows/tests.yml)
+
 A local-network administration utility for Linux. Scan your subnet, monitor host health, manage file transfers, inspect open ports, and check disk SMART status — all from one dark-themed desktop app.
 
 Built with Python and PyQt6. No server component, no browser, no subscription, no agents installed on remote hosts.
@@ -17,6 +19,10 @@ Built with Python and PyQt6. No server component, no browser, no subscription, n
   - **SMART History** — logs degradation attributes (reallocated sectors, pending sectors, uncorrectable sectors, wear, TBW) to per-host JSON files. Draws degradation charts with a custom QPainter widget. Fires desktop notifications when attributes worsen.
 - **SSH key management** — generate and push `ed25519` keys to remote hosts with one click.
 - **tmux integration** — detect existing sessions, attach to them, or create new named sessions when connecting.
+- **AI** — finds local AI servers on your network after a scan (Ollama, llama.cpp / llama-swap, LM Studio, vLLM, Open WebUI, ComfyUI, AUTOMATIC1111 and more). Servers with a web UI open in your browser (including image generators); the rest get a simple built-in chat window with a model picker, optional API key (can be remembered in your keyring), a thinking level (Default/Off/Low/Medium/High) and *Show thinking* toggle, picture attachments for vision models (shrunk and stripped of metadata), branching (regenerate a reply, edit an earlier message, switch between alternatives), and switching server/model mid-conversation. Chats save automatically, encrypted with a key from your keyring.
+- **Ask a local AI about your disks** — from Disk Health, per disk, per host or as a fleet report: LanScanMan builds a report (current SMART readings, trends and rates it calculates from its history log, its own rule-based view) and opens a chat with it in the message box for you to review before sending. AI servers are limited to your own network.
+- **New-device alerts** — after your first scan, any device not seen before is highlighted and triggers a desktop notification until you mark it as known. The device list is signed so it can't be quietly edited.
+- **Host health** — the Host Monitor also reports failed systemd services, stopped/unhealthy Docker containers, pending apt updates (security counted separately) and reboot-required, all read-only.
 - **Wake-on-LAN** — send magic packets to offline devices from the context menu.
 - **Profile system** — save aliases and usernames per device, keyed by MAC address so profiles survive DHCP IP changes.
 - **WiFi signal strength** — live dBm indicator in the status bar, reads `/proc/net/wireless` locally.
@@ -37,10 +43,11 @@ Built with Python and PyQt6. No server component, no browser, no subscription, n
 | `PyQt6` | GUI framework | `pip install PyQt6` |
 | `paramiko` | SSH/SFTP library | `pip install paramiko` |
 | `python-nmap` | Nmap Python bindings | `pip install python-nmap` |
+| `keyring` | Desktop keyring access (GNOME Keyring / KDE Wallet) | `pip install keyring` |
 
 One-liner:
 ```bash
-sudo apt install nmap rsync openssh-client && pip install PyQt6 paramiko python-nmap
+sudo apt install nmap rsync openssh-client && pip install PyQt6 paramiko python-nmap keyring
 ```
 
 ### Remote hosts (optional but recommended)
@@ -77,7 +84,7 @@ python3 main.py
 
 ## First Run
 
-1. **Scan your network** — enter your subnet (auto-detected on launch) and click **Scan Network**. You'll be prompted for your sudo password for the privileged SYN scan. Use **Scan (No Sudo)** to scan without root access (fewer details, no MACs).
+1. **Scan your network** — enter your subnet (auto-detected on launch) and click **Scan Network**. Your desktop will ask for your password for the privileged SYN scan (LanScanMan never sees it). Use **Scan (unprivileged)** to scan without root access (fewer details, no MACs).
 
 2. **Set up a profile** — right-click any discovered host → **Edit Profile**. Set a nickname and your SSH username for that machine.
 
@@ -129,11 +136,15 @@ If visudo -c reports an error, fix the file before logging out — a broken sudo
 
 ## Security Notes
 
-- The sudo password (for nmap) is held in memory only if you tick "Remember for this session". It is never written to disk.
-- SSH agent forwarding (`-A`) is only used for remote-to-remote rsync transfers. A warning is shown in the UI before any such transfer is created.
-- LanScanMan maintains its own `~/.config/LanScanMan/known_hosts` file, separate from your system `~/.ssh/known_hosts`. Any host key change triggers a visible warning dialog.
+- **Privileged scans — your choice of how to ask** (⚙ → *Ask for scan permission with*). **System prompt** (default): your desktop's polkit dialog (or polkit's terminal agent / `sudo -A` askpass if there's no agent), asked every scan; LanScanMan never sees the password. **sudo**: remembered by sudo itself for about 15 minutes, so repeat scans don't ask; it uses a graphical askpass if installed, otherwise LanScanMan's password box, whose password goes straight to sudo once and isn't kept. **sudo, remembered until LanScanMan closes (insecure)**: asked once in LanScanMan's password box and kept in memory (never on disk) until the app quits — only for machines you trust. ⚙ → *Forget remembered permission* clears any of this, and the app does so on exit. Nothing is installed; scan options are checked before asking.
+- SSH agent forwarding (`-A`) is only used for remote-to-remote rsync transfers. A warning is shown in the UI before any such transfer is created. While the transfer runs, anyone with root on the sender can use your agent to log in to any machine your key opens. If a sender might be compromised at root level, transfer remote → local, then local → remote instead.
+- **Man-in-the-middle defences.** The first connection to a host is checked against your own `~/.ssh/known_hosts`: if you've SSH'd there before and the key differs, LanScanMan refuses it instead of trusting it. Optional strict mode (⚙ → *Confirm new SSH host keys*) shows the fingerprint of any never-seen host and waits for your confirmation. A changed key later shows the old and new fingerprints and whether the scanner saw a different device take that IP, with *Keep blocked* as the default. In the AI tab, an API key for a plain-HTTP server on another machine triggers a warning and a one-time confirmation; `https://` servers can be added and are marked 🔒.
+- LanScanMan maintains its own `~/.config/LanScanMan/known_hosts`, separate from your system `~/.ssh/known_hosts`. Only LanScanMan writes it: the `ssh` and `rsync` commands it launches use `StrictHostKeyChecking=yes`, after LanScanMan has pinned the host's key itself. A changed host key shows a warning and needs your confirmation.
 - All remote commands run by the Monitor and Disk Health tabs are read-only. Nothing is installed or modified on remote hosts (except SSH keys, which you explicitly trigger).
-- Scheduled transfer lists are protected with HMAC-SHA256 using a per-install salt key. If the schedule file is modified outside LanScanMan, the app will refuse to run scheduled transfers and warn you on startup.
+- **Signed configuration.** `hosts.json`, `known_hosts` and `schedules.json` decide where LanScanMan connects and what it trusts, so each is HMAC-SHA256 signed. The signing key is kept in your desktop keyring (GNOME Keyring or KDE Wallet), encrypted with your login password. If there is no keyring it falls back to `hmac.key`. Existing files are signed the first time the key is unlocked after upgrading. A file changed outside LanScanMan blocks all connections until you review it.
+- **If you decline the keyring at startup**, LanScanMan still opens and shows your saved hosts. Anything that connects, transfers or edits a profile asks for the keyring again first. Scheduled transfers stay off for that session.
+- **SSH keys get a passphrase.** LanScanMan never creates a key without one. It runs `ssh-keygen` in a terminal so it never sees the passphrase, and it warns at startup if `~/.ssh/id_ed25519` is unencrypted. GNOME asks for the passphrase the first time the key is used and can remember it in your login keyring.
+- The keyring protects the key *at rest*: a stolen disk, a leaked backup of `~/.config`, or a bug that exposes your files won't reveal it. It does not stop malware already running as your user while the keyring is unlocked, because Linux keyrings don't restrict which of your programs can read an item.
 - All subprocess calls use list form (`shell=False`). User-supplied paths and rsync arguments are validated against a forbidden character set before use.
 - No telemetry, no update checks, no network traffic beyond your local subnet.
 
@@ -150,9 +161,13 @@ All data is stored under `~/.config/LanScanMan/`:
 | `hosts.json` | Host aliases, usernames, MAC→IP mappings |
 | `transfer_history.json` | Completed transfer records |
 | `schedules.json` | Scheduled rsync lists |
-| `schedules.hmac` | HMAC integrity signature for schedules.json |
-| `hmac.key` | Per-install HMAC salt (600 permissions) |
+| `schedules.hmac` | HMAC signature for schedules.json |
+| `hosts.json.sig`, `known_hosts.sig` | HMAC signatures for hosts.json and known_hosts |
+| `hmac.key` | Signing key — **only when no keyring is available**; otherwise it's in the keyring as *LanScanMan / integrity-key* |
 | `smart_log/<profile>.json` | Per-host SMART attribute history |
+| `devices.json` (+ `.sig`) | Every device seen on the network, for new-device alerts (signed) |
+| `security.json` (+ `.sig`) | Security preferences — strict mode, password-box fallback (signed; tampering assumes the strict choice) |
+| `chats/` | Saved AI chats — encrypted (AES-256-GCM, key derived from your keyring) |
 | `lanscanman.log` | Rotating application log |
 | `known_hosts` | SSH host keys (separate from system known_hosts) |
 
@@ -162,23 +177,45 @@ All data is stored under `~/.config/LanScanMan/`:
 
 ```
 LanScanMan/
-├── main.py                    # Application entry point and main window
-├── manager.py                 # NetworkManager: profiles, SSH, WoL, ping
-├── scanner.py                 # ScannerThread: nmap subnet scan wrapper
-├── wifi_widget.py             # Local WiFi signal strength status bar widget
-├── log.py                     # Centralised logger (console + rotating file)
-├── schedule_manager.py        # Schedule data model, HMAC integrity, path validation
-├── requirements.txt
-└── tabs/
-    ├── dialogs.py             # Shared dialogs: CustomPortConnectDialog
-    ├── scanner_tab.py         # Network Scanner tab
-    ├── host_inspector_tab.py  # Host Inspector tab
-    ├── transfer_tab.py        # File Transfers tab (Queue + Schedules)
-    ├── schedule_ui.py         # Schedules UI, ScheduledRunner, run detail dialog
-    ├── monitor_tab.py         # Host Monitor tab (CPU/GPU/RAM)
-    ├── smart_tab.py           # Disk Health tab (SMART)
-    ├── smart_log.py           # SMART history logger and chart dialog
-    └── about_tab.py           # About and Security documentation tab
+├── main.py              # entry point: python3 main.py
+├── lanscanman/
+│   ├── app.py           # main window, tab wiring, schedule timer
+│   ├── paths.py         # every file under ~/.config/LanScanMan
+│   ├── core/            # pure logic — parsers, command builders, data model (no Qt)
+│   ├── services/        # SSH (paramiko), NetworkManager, subprocess side effects
+│   ├── workers/         # QThreads: scans, probes, rsync, scheduled runs
+│   └── ui/              # tabs/, dialogs/, widgets/, theme.py, resources/about.html
+├── tests/               # pytest suite — never touches the network
+└── docs/ARCHITECTURE.md # layers, data flow, conventions, known issues
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the layers fit together.
+
+---
+
+## Development
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+QT_QPA_PLATFORM=offscreen pytest        # ~220 tests, about a second
+python -m pyflakes lanscanman           # lint
+isort lanscanman tests                  # import order
+```
+
+The test suite blocks nmap, ping, ssh, rsync, sudo and outgoing sockets. A
+test that tries to use them fails, so the suite is safe to run on any network.
+It also uses a throwaway config directory, so your real profiles and schedules
+are never touched. You can point the app itself at a different config directory
+with `LANSCANMAN_CONFIG_DIR=/some/dir python3 main.py`.
+
+### Continuous integration and releases
+
+- Every push and pull request runs lint and the full test suite on Python 3.10 and 3.12 (`.github/workflows/tests.yml`).
+- Pushing a tag such as `v0.3.0` runs the tests, builds the AppImage, smoke-tests it and attaches it (with a SHA-256 checksum) to a new GitHub release (`.github/workflows/release.yml`):
+
+```bash
+git tag v0.3.0 && git push origin v0.3.0
 ```
 
 ---
