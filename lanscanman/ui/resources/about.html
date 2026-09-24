@@ -199,8 +199,20 @@
         <td><code>pip install PyQt6</code></td>
     </tr>
     <tr>
-        <td><code>rsync</code></td>
-        <td>File transfers — the File Transfers tab builds rsync commands and streams their progress output</td>
+<td><code>keyring</code></td>
+<td>Python access to your desktop keyring (GNOME Keyring, KDE Wallet — any Secret Service) for the signing key, the chat key and remembered API keys</td>
+<td><span class="tag-warn">Strongly recommended</span></td>
+<td><code>pip install keyring</code></td>
+</tr>
+<tr>
+<td><code>polkit</code> (<code>pkexec</code>)</td>
+<td>Asks for the admin password for privileged scans in your desktop's own dialog, so LanScanMan never sees it. Without it, sudo is used</td>
+<td><span class="tag-muted">Usually pre-installed</span></td>
+<td><code>sudo apt install pkexec</code></td>
+</tr>
+<tr>
+<td><code>rsync</code></td>
+<td>File transfers — the File Transfers tab builds rsync commands and streams their progress output</td>
         <td><span class="tag-warn">Needed for transfers</span></td>
         <td><code>sudo apt install rsync</code></td>
     </tr>
@@ -238,7 +250,7 @@
 
 <div class="info-box">
     <strong>Quick install — everything at once (local machine):</strong><br>
-    <code>sudo apt install nmap rsync openssh-client &amp;&amp; pip install PyQt6 paramiko python-nmap</code><br><br>
+    <code>sudo apt install nmap rsync openssh-client &amp;&amp; pip install PyQt6 paramiko python-nmap keyring</code><br><br>
     <strong>Quick install — remote host full features:</strong><br>
     <code>sudo apt install smartmontools tmux rsync openssh-server</code>
 </div>
@@ -314,9 +326,9 @@
     <li><strong>Disk Health</strong> — same as Host Monitor</li>
 </ul>
 
-<h3>No-sudo scan and profile matching</h3>
+<h3>Unprivileged scan and profile matching</h3>
 <p>
-    The unprivileged scan (<em>Scan No Sudo</em>) uses TCP connect instead
+    The unprivileged scan (<em>Scan (unprivileged)</em>) uses TCP connect instead
     of ARP, so nmap cannot determine MAC addresses. When populating the
     scanner table after a no-sudo scan, LanScanMan builds a reverse lookup
     from stored <code>last_ip</code> values so that a scan result for
@@ -356,10 +368,16 @@
     Ping latency is then measured independently for every discovered host.
 </p>
 
-<h3>Commands executed — locally, as root via sudo</h3>
+<h3>Commands executed — locally, as root</h3>
 <div class="cmd-block">
-    sudo nmap -sS -p 22,80,443,3389,5900,8080 -PR -T4 --host-timeout 15s -oX - &lt;subnet&gt;
+nmap -sS -p 22,80,443,3389,5900,8080 -PR -T4 --host-timeout 15s -oX - &lt;subnet&gt;
 </div>
+<p>
+Root is obtained the way you chose under ⚙ → <em>Ask for scan permission
+with</em>: <code>pkexec nmap …</code> (your desktop's polkit prompt) or
+<code>sudo nmap …</code> — see <em>Admin password for privileged scans</em>
+under Security below. The arguments are checked before anything is asked.
+</p>
 <p>
     Flags explained:
 </p>
@@ -567,7 +585,7 @@
 </p>
 
 <table>
-    <tr><th></th><th>Scan Network (sudo)</th><th>Scan (No Sudo)</th></tr>
+    <tr><th></th><th>Scan Network (privileged)</th><th>Scan (unprivileged)</th></tr>
     <tr>
         <td>Nmap scan type</td>
         <td>SYN scan (<code>-sS</code>) — sends a raw TCP SYN, reads the response, never completes the handshake</td>
@@ -594,8 +612,8 @@
         <td>Full TCP handshakes are more visible to firewalls and IDS systems</td>
     </tr>
     <tr>
-        <td>Sudo password</td>
-        <td>Required (can be remembered for the session)</td>
+        <td>Admin password</td>
+<td>Required — asked by polkit or sudo, as chosen under ⚙ (sudo can remember it)</td>
         <td>Not required</td>
     </tr>
 </table>
@@ -720,9 +738,10 @@
 
 <h3>Remote command — SMART data (tries sudo first, falls back to udisksctl)</h3>
 <div class="cmd-block">
-    sudo -n smartctl -iAH /dev/&lt;disk&gt; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="tag-muted"># tier 1: passwordless sudo</span><br>
-    smartctl -iAH /dev/&lt;disk&gt; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="tag-muted"># tier 2: direct (if setuid)</span><br>
-    <span class="tag-muted"># tier 3: read cached values from the udisksctl dump above</span>
+    sudo -n smartctl -j -iAH /dev/&lt;disk&gt; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="tag-muted"># tier 1: passwordless sudo</span><br>
+    smartctl -j -iAH /dev/&lt;disk&gt; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="tag-muted"># tier 2: direct (if setuid)</span><br>
+    <span class="tag-muted"># tier 3: read cached values from the udisksctl dump above</span><br>
+<span class="tag-muted"># (-j = JSON output; left out on smartmontools older than 7.0)</span>
 </div>
 
 <h3>SMART data tiers explained</h3>
@@ -826,7 +845,7 @@
     <tr>
         <td>Config tampering</td>
         <td>An edited hosts.json or known_hosts could redirect your connections (and, for remote-to-remote transfers, your forwarded SSH agent) to another machine</td>
-        <td>hosts.json, known_hosts and schedules.json are HMAC-signed with a key kept in your desktop keyring. A file that fails verification blocks all connections until you review it.</td>
+        <td>hosts.json, known_hosts, schedules.json, devices.json and security.json are HMAC-signed with a key kept in your desktop keyring. A file that fails verification blocks all connections until you review it.</td>
     </tr>
     <tr>
         <td>SSH private key</td>
@@ -842,7 +861,7 @@
 
 <h3>What this app does NOT do</h3>
 <ul>
-    <li>Does not store or transmit passwords (sudo or SSH)</li>
+    <li>Does not write passwords (sudo or SSH) to disk or logs, or send them anywhere but sudo — only the opt-in <em>remembered until LanScanMan closes</em> mode keeps the admin password, in memory</li>
     <li>Does not modify any files on remote hosts (all remote operations are read-only, except SSH key installation which you explicitly trigger)</li>
     <li>Does not phone home, check for updates, or send any telemetry</li>
     <li>Does not change anything on remote hosts to "fix" what the health
@@ -857,8 +876,8 @@
     app requests only the access it needs. SSH key auth is used instead of
     passwords wherever possible. Remote commands use the minimum privilege
     level available — udisksctl before sudo, read-only /proc and /sys before
-    any elevated tool. Sudo is only invoked for Nmap (required for SYN scan)
-    and smartctl (optional, with explicit user setup).
+    any elevated tool. Root is only requested for Nmap (required for SYN scan, via polkit or sudo)
+and smartctl (optional, with explicit user setup).
 </div>
 
 <hr>
@@ -889,14 +908,42 @@
     <tr>
         <td><code>*.sig</code>, <code>schedules.hmac</code></td>
         <td>
-            HMAC-SHA256 signatures of hosts.json, known_hosts and schedules.json.
+            HMAC-SHA256 signatures of hosts.json, known_hosts, schedules.json,
+devices.json and security.json.
             The signing key is in your keyring as <em>LanScanMan / integrity-key</em>
             (or <code>hmac.key</code> if there is no keyring).
         </td>
         <td>Whenever LanScanMan writes the file it signs</td>
     </tr>
     <tr>
-        <td><code>~/.config/LanScanMan/chats/</code></td>
+<td><code>~/.config/LanScanMan/devices.json</code></td>
+<td>
+Every device the scanner has seen (MAC, IPs, hostname, vendor, first and
+last seen, whether you marked it known), for new-device alerts and the
+IP history shown when a host key changes. Signed.
+</td>
+<td>After each privileged scan; when you mark a device as known</td>
+</tr>
+<tr>
+<td><code>~/.config/LanScanMan/security.json</code></td>
+<td>
+Security preferences: strict host-key mode and how scans ask for
+permission. Signed; if it has been tampered with, the strict choices
+are assumed.
+</td>
+<td>When you change a setting under ⚙</td>
+</tr>
+<tr>
+<td>Desktop keyring (not a file)</td>
+<td>
+<em>LanScanMan / integrity-key</em> — signs the files above and derives the
+chat encryption key. <em>LanScanMan / api-key …</em> — AI server API keys,
+only if you tick <em>Remember in keyring</em>.
+</td>
+<td>First run; when you choose to remember an API key</td>
+</tr>
+<tr>
+<td><code>~/.config/LanScanMan/chats/</code></td>
         <td>
             Saved AI chats (one <code>.chat</code> file each, plus <code>index.bin</code>),
             including any pictures you attached. Encrypted with AES-256-GCM using a
@@ -1079,12 +1126,13 @@
     </tr>
 </table>
 
-<h3>Commands executed — locally, as root via sudo (when sudo is enabled)</h3>
+<h3>Commands executed — locally, as root (privileged scans)</h3>
 <div class="cmd-block">
-    sudo nmap -sS -sV --version-intensity 5 [port-arg] -T4 -oX - &lt;host-ip&gt;
+nmap -sS -sV --version-intensity 5 [port-arg] -T4 -oX - &lt;host-ip&gt;
 </div>
 <p>
-    Without sudo, falls back to <code>-sT</code> (TCP connect scan).
+    Root is obtained via polkit or sudo, as for the Network Scanner.
+Unprivileged, it falls back to <code>-sT</code> (TCP connect scan).
     Version detection (<code>-sV</code>) works in both modes but is more
     accurate with a SYN scan.
 </p>
@@ -1246,7 +1294,7 @@
     <tr><th>Shortcut</th><th>Action</th></tr>
     <tr>
         <td><code>Ctrl + R</code></td>
-        <td>Start a privileged SYN scan. Prompts for sudo password if not cached.</td>
+        <td>Start a privileged SYN scan. Asks for permission the way you chose under ⚙.</td>
     </tr>
     <tr>
         <td><code>Ctrl + Shift + R</code></td>
@@ -1299,6 +1347,19 @@
         <td><code>Enter / Return</code></td>
         <td>Open the connection dialog for the selected result row.</td>
     </tr>
+</table>
+
+<h3>AI chat window</h3>
+<table>
+<tr><th>Shortcut</th><th>Action</th></tr>
+<tr>
+<td><code>Ctrl + Enter</code></td>
+<td>Send the message (or stop the reply while it is streaming).</td>
+</tr>
+<tr>
+<td><code>Ctrl + V</code></td>
+<td>Paste a picture from the clipboard (vision models).</td>
+</tr>
 </table>
 
 </div>
