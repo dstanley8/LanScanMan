@@ -367,6 +367,15 @@
     presented in a table alongside hostnames, open ports, and SSH status.
     Ping latency is then measured independently for every discovered host.
 </p>
+<p>
+<strong>Subnet.</strong> The /24 of the network you're on is filled in
+automatically, and kept up to date — if LanScanMan starts before you're
+connected, or you switch networks, it changes by itself (checked every few
+seconds, by asking the kernel which address it would use; no packets are
+sent). Once you type a subnet of your own it is left alone; <em>⟳</em>
+re-detects it and resumes following the network. If you're not connected,
+⟳ says so and leaves the subnet as it was.
+</p>
 
 <h3>Commands executed — locally, as root</h3>
 <div class="cmd-block">

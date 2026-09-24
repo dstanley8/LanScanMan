@@ -1,7 +1,9 @@
-"""Small network helpers: Wake-on-LAN packets, ping output, MAC addresses."""
+"""Small network helpers: Wake-on-LAN packets, ping output, MAC addresses,
+the subnet to scan."""
 
 from __future__ import annotations
 
+import ipaddress
 import re
 
 _MAC_RE = re.compile(r"^[0-9a-fA-F]{2}([:-][0-9a-fA-F]{2}){5}$")
@@ -23,3 +25,15 @@ def parse_ping_latency(stdout: str) -> str | None:
         if "time=" in line:
             return f"{float(line.split('time=')[1].split(' ')[0]):.1f}ms"
     return None
+
+
+def subnet_of(ip: str | None) -> str | None:
+    """The /24 the scanner sweeps for this machine's address:
+    '192.168.1.37' -> '192.168.1.0/24'. None for no usable address."""
+    try:
+        addr = ipaddress.IPv4Address(ip or "")
+    except ValueError:
+        return None
+    if addr.is_loopback or addr.is_unspecified or addr.is_link_local:
+        return None
+    return str(ipaddress.IPv4Network(f"{addr}/24", strict=False))

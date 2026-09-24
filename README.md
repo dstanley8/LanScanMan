@@ -98,7 +98,7 @@ python3 main.py
 
 ## First Run
 
-1. **Scan your network** — enter your subnet (auto-detected on launch) and click **Scan Network**. Your desktop will ask for your password for the privileged SYN scan (LanScanMan never sees it). Use **Scan (unprivileged)** to scan without root access (fewer details, no MACs).
+1. **Scan your network** — check the subnet and click **Scan Network**. It's detected automatically and follows you when you connect or switch networks; press **⟳** to re-detect it after typing your own. Your desktop will ask for your password for the privileged SYN scan (LanScanMan never sees it). Use **Scan (unprivileged)** to scan without root access (fewer details, no MACs).
 
 2. **Set up a profile** — right-click any discovered host → **Edit Profile**. Set a nickname and your SSH username for that machine.
 

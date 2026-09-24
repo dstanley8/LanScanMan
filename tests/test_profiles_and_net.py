@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from lanscanman.core.net import is_mac, magic_packet, parse_ping_latency
+from lanscanman.core.net import is_mac, magic_packet, parse_ping_latency, subnet_of
 from lanscanman.core.profiles import ProfileStore
 from lanscanman.core.wifi import (
     dbm_to_label,
@@ -140,3 +140,72 @@ def test_dbm_labels(dbm, bars, quality):
     assert dbm_to_label(dbm)[0].endswith(bars)
     assert signal_quality(dbm) == quality
     assert dbm_to_label(None)[0] == "WiFi: ?"
+
+
+# ── Subnet detection ─────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("ip,subnet", [
+    ("192.168.1.37", "192.168.1.0/24"), ("10.20.30.40", "10.20.30.0/24"),
+    ("127.0.0.1", None), ("0.0.0.0", None), ("169.254.3.4", None),
+    ("", None), (None, None), ("not an ip", None), ("fe80::1", None),
+])
+def test_subnet_of(ip, subnet):
+    assert subnet_of(ip) == subnet
+
+
+def _scanner_at(qapp, monkeypatch, ip):
+    from lanscanman.app import LanScanManApp
+    from lanscanman.ui.tabs import scanner_tab
+    where = {"ip": ip}
+    monkeypatch.setattr(scanner_tab, "_local_ipv4", lambda: where["ip"])
+    win = LanScanManApp()
+    win._schedule_timer.stop()
+    return win, win.scanner_page, where
+
+
+def test_subnet_detected_at_startup(qapp, monkeypatch):
+    _, tab, _ = _scanner_at(qapp, monkeypatch, "192.168.7.20")
+    assert tab.subnet_input.text() == "192.168.7.0/24"
+
+
+def test_started_offline_follows_network_once_connected(qapp, monkeypatch):
+    win, tab, where = _scanner_at(qapp, monkeypatch, None)
+    assert tab.subnet_input.text() == "192.168.1.0/24"
+    tab._follow_network()                              # still offline: no change
+    assert tab.subnet_input.text() == "192.168.1.0/24"
+    where["ip"] = "192.168.50.23"
+    tab._follow_network()
+    assert tab.subnet_input.text() == "192.168.50.0/24"
+    assert "Network changed" in win.status.text()
+    where["ip"] = "172.16.4.9"                         # switched networks
+    tab._follow_network()
+    assert tab.subnet_input.text() == "172.16.4.0/24"
+
+
+def test_typed_subnet_is_never_overwritten_automatically(qapp, monkeypatch):
+    _, tab, where = _scanner_at(qapp, monkeypatch, "192.168.7.20")
+    tab.subnet_input.setText("10.8.0.0/16")
+    where["ip"] = "192.168.50.23"
+    tab._follow_network()
+    assert tab.subnet_input.text() == "10.8.0.0/16"
+    tab._subnet_btn.click()                            # ⟳ takes over again
+    assert tab.subnet_input.text() == "192.168.50.0/24"
+    where["ip"] = "172.16.4.9"
+    tab._follow_network()
+    assert tab.subnet_input.text() == "172.16.4.0/24"
+
+
+def test_refresh_while_offline_keeps_subnet(qapp, monkeypatch):
+    win, tab, where = _scanner_at(qapp, monkeypatch, "192.168.7.20")
+    where["ip"] = None
+    tab._subnet_btn.click()
+    assert tab.subnet_input.text() == "192.168.7.0/24"
+    assert "Not connected" in win.status.text()
+
+
+def test_subnet_not_changed_during_a_scan(qapp, monkeypatch):
+    _, tab, where = _scanner_at(qapp, monkeypatch, "192.168.7.20")
+    tab._set_scanning_ui(True)
+    where["ip"] = "192.168.50.23"
+    tab._follow_network()
+    assert tab.subnet_input.text() == "192.168.7.0/24"

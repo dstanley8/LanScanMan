@@ -38,6 +38,7 @@ from lanscanman.core.connect import (
     tmux_command,
 )
 from lanscanman.core.integrity import IntegrityError, KeyUnavailable, TamperedError
+from lanscanman.core.net import subnet_of
 from lanscanman.core.notify import notify
 from lanscanman.log import log
 from lanscanman.services import privilege, security_settings
@@ -66,6 +67,22 @@ from lanscanman.workers.scanner import ScannerThread
 # Main Tab
 # ─────────────────────────────────────────────────────────────────────────────
 
+
+FALLBACK_SUBNET = "192.168.1.0/24"      # shown when started with no network
+SUBNET_CHECK_MS = 5000
+
+
+def _local_ipv4() -> str | None:
+    """This machine's address on the network it would use to reach the
+    internet. A UDP "connect" sends no packets — the kernel just picks the
+    route — so this is free to call often."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:       # OSError when offline (and blocked in tests)
+        return None
+
 class ScannerTab(QWidget):
     hosts_changed = pyqtSignal()      # the table's host list changed (scan, add, clear)
 
@@ -91,7 +108,21 @@ class ScannerTab(QWidget):
         # disable this in ⚙ to show shortcuts for all online hosts.
         self._show_unconfirmed_services = False
 
-        self.subnet_input = QLineEdit(self.get_default_subnet())
+        # The subnet follows the network you're on (checked every few seconds)
+        # until you type your own; ⟳ re-detects it and resumes following.
+        self._filled_subnet = self.detect_subnet() or FALLBACK_SUBNET
+        self.subnet_input = QLineEdit(self._filled_subnet)
+        self._subnet_btn = QPushButton("⟳")
+        self._subnet_btn.setFixedWidth(32)
+        self._subnet_btn.setToolTip(
+            "Detect the subnet of the network you're connected to.\n"
+            "It also updates by itself when the network changes, unless\n"
+            "you've typed a subnet of your own.")
+        self._subnet_btn.clicked.connect(self.refresh_subnet)
+        self._subnet_timer = QTimer(self)
+        self._subnet_timer.setInterval(SUBNET_CHECK_MS)
+        self._subnet_timer.timeout.connect(self._follow_network)
+        self._subnet_timer.start()
 
         self.scan_btn = QPushButton("Scan Network")
         self.scan_btn.setToolTip(
@@ -119,6 +150,7 @@ class ScannerTab(QWidget):
 
         top_bar.addWidget(QLabel("Subnet:"))
         top_bar.addWidget(self.subnet_input)
+        top_bar.addWidget(self._subnet_btn)
         top_bar.addWidget(self.scan_btn)
         top_bar.addWidget(self.scan_nosudo_btn)
         top_bar.addWidget(self.cancel_btn)
@@ -180,15 +212,37 @@ class ScannerTab(QWidget):
         if row >= 0:
             self.delete_profile(row)
 
-    def get_default_subnet(self):
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ".".join(ip.split(".")[:-1]) + ".0/24"
-        except Exception:
-            return "192.168.1.0/24"
+    @staticmethod
+    def detect_subnet() -> str | None:
+        """The /24 of the network this machine is on, or None if not connected."""
+        return subnet_of(_local_ipv4())
+
+    def refresh_subnet(self):
+        subnet = self.detect_subnet()
+        if subnet is None:
+            self.parent_window.status.setText(
+                "Not connected to a network — subnet left as it was.")
+            return
+        self._filled_subnet = subnet
+        if self.subnet_input.text().strip() == subnet:
+            self.parent_window.status.setText(f"Subnet is {subnet}.")
+            return
+        self.subnet_input.setText(subnet)
+        self.parent_window.status.setText(f"Subnet set to {subnet}.")
+
+    def _follow_network(self):
+        """Update the subnet after connecting or switching networks — but
+        never over one the user typed, and not while a scan runs."""
+        if self.subnet_input.text().strip() != self._filled_subnet:
+            return
+        if not self.cancel_btn.isHidden():
+            return
+        subnet = self.detect_subnet()
+        if subnet is None or subnet == self._filled_subnet:
+            return
+        self._filled_subnet = subnet
+        self.subnet_input.setText(subnet)
+        self.parent_window.status.setText(f"Network changed — subnet set to {subnet}.")
 
     def _set_scanning_ui(self, scanning: bool):
         self.scan_btn.setVisible(not scanning)
