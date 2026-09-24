@@ -6,3 +6,4 @@ Exec=lanscanman
 Icon=lanscanman
 Terminal=false
 Categories=Network;System;Utility;
+StartupWMClass=LanScanMan

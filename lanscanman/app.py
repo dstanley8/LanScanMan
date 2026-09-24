@@ -255,8 +255,22 @@ def _excepthook(exc_type, exc, tb):
     log.error("unhandled exception", exc_info=(exc_type, exc, tb))
 
 
+def _name_process(name: str) -> None:
+    """Show as LanScanMan, not python3, in top / System Monitor (Linux)."""
+    try:
+        import ctypes
+        ctypes.CDLL(None).prctl(15, name.encode(), 0, 0, 0)     # PR_SET_NAME
+    except (OSError, AttributeError):
+        pass
+
+
 def main() -> int:
-    app = QApplication(sys.argv)
+    _name_process("LanScanMan")
+    # argv[0] would otherwise be __main__.py / python3: Qt derives the X11
+    # WM_CLASS from it, and docks group and label windows by that
+    app = QApplication(["lanscanman", *sys.argv[1:]])
+    app.setApplicationName("LanScanMan")
+    app.setDesktopFileName("lanscanman")      # Wayland app_id -> lanscanman.desktop
     set_vault(Vault(SecretStore.default()))
     sys.excepthook = _excepthook
     window = LanScanManApp()
